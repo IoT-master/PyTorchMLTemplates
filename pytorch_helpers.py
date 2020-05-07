@@ -38,14 +38,9 @@ def train_test_split_even(dataframe, label_name, shuffle=True, test_decimal=0.2,
     assert test_decimal > 0
     tt_boarder = int(dataframe.shape[0]*(1-test_decimal))
     if even_num_labels:
-        type_count = []
-        for each_type in dataframe[label_name].unique():
-             type_count.append(dataframe[each_type == dataframe[label_name]].shape[0])
-        min_sample = min(type_count)
-        print(min_sample)
+        min_sample = min(y_train.value_counts())
         
         train_df = pd.DataFrame(columns=dataframe.columns)
-        print(tt_boarder, min_sample*len(type_count)*(1-test_decimal))
         if tt_boarder >= min_sample*len(type_count)*(1-test_decimal):
             if shuffle:
                 for each_type in dataframe[label_name].unique():
@@ -62,3 +57,14 @@ def train_test_split_even(dataframe, label_name, shuffle=True, test_decimal=0.2,
                     train_df = train_df.append(dataframe[each_type == dataframe[label_name]][:tt_boarder//len(type_count)])
         test_df = dataframe.drop(train_df.index)
     return train_df, test_df
+
+def my_hot_encoding(dataframe, feature_list_to_encode):
+    encoding_dict = {}
+    for each_feature in feature_list_to_encode:
+        feature_dict = {}
+        for index_type, each_type in enumerate(dataframe[each_feature].unique()):
+            feature_dict[each_type] = index_type
+        encoding_dict[each_feature] = feature_dict
+    for each_feature in feature_list_to_encode:
+        dataframe[each_feature] = dataframe[each_feature].map(lambda x: encoding_dict[each_feature][x])
+    return encoding_dict
