@@ -1,4 +1,5 @@
-# from sklearn.metrics import accuracy_score, precision_score, recall_score
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score
 import torch.optim as optim
 import torch.nn as nn
 import torch
@@ -77,8 +78,6 @@ def even_distribution(dataframe: pd, label, my_sample_number=5, shuffle=True):
             dataframe_train_df = dataframe.head(my_sample_number).copy()
         return dataframe_train_df, dataframe.drop(dataframe_train_df.index).copy()
 
-
-class FeaturesLabelSplitter(data.Dataset):
     'Characterizes a dataset for PyTorch'
 
     def __init__(self, dataframe, feat_label_float, feat_label_int):
@@ -116,8 +115,49 @@ class FeaturesLabelSplitter(data.Dataset):
         # Using torch datatypes
         X = torch.FloatTensor(
             self.dataframe[self.feat_label_float].to_numpy())[index]
-        y = torch.IntTensor(
-            self.dataframe[self.feat_label_int].to_numpy())[index]
+        y = torch.LongTensor(
+            self.dataframe[self.feat_label_int].to_numpy().squeeze())[index]
+        return X, y
+
+
+class FeaturesLabelSplitter2(data.Dataset):
+    'Characterizes a dataset for PyTorch'
+
+    def __init__(self, X_train, y_train):
+        """[summary]
+
+        Arguments:
+            dataframe {[type]} -- [description]
+            feat_label_float {[type]} -- [description]
+            feat_label_int {[type]} -- [description]
+        """
+        self.X_train = X_train
+        self.y_train = y_train
+
+    def __len__(self):
+        """[summary]
+
+        Returns:
+            [type] -- [description]
+        """
+        'Denotes the total number of samples'
+        return self.X_train.shape[0]
+
+    def __getitem__(self, index):
+        """[summary]
+
+        Arguments:
+            index {[type]} -- [description]
+
+        Returns:
+            [type] -- [description]
+        """
+        'Generates one sample of data'
+        # Load data and get label
+        # Using torch datatypes
+        X = self.X_train[index]
+        y = self.y_train[index]
+
         return X, y
 
 
@@ -132,10 +172,26 @@ print(iris_train.head())
 print(iris_test.head())
 print(iris_train.shape, iris_test.shape)
 print(iris.columns)
-grouping_instance = FeaturesLabelSplitter(
-    iris_train, ['SepalLength', 'SepalWidth', 'PetalLength', 'PetalWidth'], ['Name'])
+# X_train_tensor = X_train_tensor.to(device)
+X_train = torch.FloatTensor(iris_train[['SepalLength', 'SepalWidth',
+                                        'PetalLength', 'PetalWidth']].to_numpy())
+y_train = torch.LongTensor(iris_train['Name'].to_numpy().squeeze())
+
+X_test = torch.FloatTensor(iris_test[['SepalLength', 'SepalWidth',
+                                      'PetalLength', 'PetalWidth']].to_numpy())
+y_test = torch.LongTensor(iris_test['Name'].to_numpy().squeeze())
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(device)
+X_train.to(device)
+y_train.to(device)
+X_test.to(device)
+y_test.to(device)
+grouping_instance = FeaturesLabelSplitter2(X_train, y_train)
+# grouping_instance = FeaturesLabelSplitter(
+#     iris_train, ['SepalLength', 'SepalWidth', 'PetalLength', 'PetalWidth'], ['Name'])
 # print(grouping_instance.__getitem__(1))
-params = {'batch_size': 7,
+params = {'batch_size': 10,
           'shuffle': True,
           'num_workers': 2}
 training_generator = data.DataLoader(grouping_instance, **params)
@@ -146,7 +202,7 @@ training_generator = data.DataLoader(grouping_instance, **params)
 input_size = 4
 output_size = 3
 
-hidden1_size = 3
+hidden1_size = 16
 # hidden2_size = 32
 
 
@@ -162,42 +218,51 @@ class Net(nn.Module):
     def forward(self, x):
         x = torch.sigmoid(self.fc1(x))
         # x = torch.sigmoid(self.fc2(x))
-        # x = self.fc3(x)
+        x = self.fc3(x)
 
         return torch.log_softmax(x, dim=-1)
+        # return x
 
 
 model = Net()
-optimizer = optim.Adam(model.parameters())
+print(model)
+model.to(device)
+
+# optimizer = optim.Adam(model.parameters())
+# optimizer = optim.Adam(model.parameters(), lr=0.01)
+optimizer = optim.SGD(model.parameters(), lr=0.01)
 # learning rate is at default
 loss_fn = nn.NLLLoss()
+# loss_fn = nn.CrossEntropyLoss()
 
 epochs = 500
 for epoch in range(1, epochs + 1):
     for X_train_tensor, Y_train_tensor in training_generator:
         optimizer.zero_grad()
         Y_pred = model(X_train_tensor)
-        loss = loss_fn(Y_pred, Y_train_tensor.type(
-            torch.LongTensor).squeeze(1))
+        loss = loss_fn(Y_pred, Y_train_tensor)
         loss.backward()
         optimizer.step()
     if epoch % 10 == 0:
         # print('Epoch - %d, loss - %0.2f' % (epoch, loss.item()))
         print(f'Epoch - {epoch:d}, loss - {loss.item():0.4f}')
 
-# model.eval()
-# from sklearn.metrics import accuracy_score, precision_score, recall_score
-# with torch.no_grad():
+model.eval()
 
-#   correct = 0
-#   total = 0
+with torch.no_grad():
 
-#   outputs = model(x_test_tensor)
-#   _, predicted = torch.max(outputs.data, 1)
+    correct = 0
+    total = 0
 
-#   y_test = y_test_tensor.cpu().numpy()
-#   predicted = predicted.cpu()
+    outputs = model(X_test)
+    _, predicted = torch.max(outputs.data, 1)
 
-#   print("Accuracy: ", accuracy_score(predicted, y_test))
-#   print("Precision: ", precision_score(predicted, y_test, average='weighted'))
-#   print("Recall: ", recall_score(predicted, y_test, average='weighted'))
+    y_test = y_test.cpu().numpy()
+    predicted = predicted.cpu()
+
+    print("Accuracy: ", accuracy_score(predicted, y_test))
+    print("Precision: ", precision_score(
+        predicted, y_test, average='weighted'))
+    print("Recall: ", recall_score(predicted, y_test, average='weighted'))
+
+print(confusion_matrix(y_test, predicted))
