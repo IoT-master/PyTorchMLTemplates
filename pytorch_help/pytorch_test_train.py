@@ -17,13 +17,13 @@ def even_distribution(dataframe: pd, label, my_sample_number=5, shuffle=True):
     else:
         print(value_count_output)
         print(dataframe.shape)
-        print('Resorting to normal output')
+        # print('Resorting to normal output')
         assert my_sample_number > dataframe.shape[0]
         if shuffle:
-            dataframe_train_df = dataframe.sample(my_sample_number)
+            dataframe_train_df = dataframe.sample(my_sample_number).copy()
         else:
-            dataframe_train_df = dataframe.head(my_sample_number)
-        return dataframe_train_df, dataframe_train_df.drop(dataframe_train_df.index)
+            dataframe_train_df = dataframe.head(my_sample_number).copy()
+        return dataframe_train_df, dataframe.drop(dataframe_train_df.index).copy()
 
 def my_hot_encoding(dataframe, feature_list_to_encode):
     encoding_dict = {}
@@ -48,20 +48,33 @@ def train_test_split(dataframe, shuffle=False, test_decimal=.2):
     test_df = dataframe.drop(train_df.index)
     return train_df, test_df
 
+def mean_std_table(dataframe):
+    mean_std_dict = {}
+    for each_column, each_dtype in zip(iris.columns, iris.dtypes):
+        if each_dtype == 'float64':
+            column_mean = iris[each_column].mean()
+            column_std = iris[each_column].std()
+            mean_std_dict[each_column] = column_mean, column_std
+            dataframe[each_column] = (dataframe[each_column]- column_mean)/(column_std**2)
+    return mean_std_dict
+
 if __name__=="__main__":
     iris_main = pd.read_csv('https://raw.githubusercontent.com/pandas-dev/pandas/master/pandas/tests/data/iris.csv')
     iris = iris_main.copy()
-    x, y = even_distribution(iris, 'Name', 5, False)
+    x, y = even_distribution(iris, 'Name', 30, True)
     print(x, len(x))
     print(y, len(y))
     
 
-    unique_dict = my_hot_encoding(iris, ['Name'])
-    print(iris.dtypes)
-    print(unique_dict)
-    print(iris)
-    print(iris.dtypes)
+    # unique_dict = my_hot_encoding(iris, ['Name'])
+    # print(iris.dtypes)
+    # print(unique_dict)
+    # print(iris)
+    # print(iris.dtypes)
 
-    a, b = train_test_split(iris)
-    print(a)
-    print(b)
+    # a, b = train_test_split(iris)
+    # print(a)
+    # print(b)
+
+    # my_stats_dict = mean_std_table(iris)
+    # print(my_stats_dict)
