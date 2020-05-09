@@ -229,11 +229,11 @@ print(model)
 model.to(device)
 
 # optimizer = optim.Adam(model.parameters())
-# optimizer = optim.Adam(model.parameters(), lr=0.01)
-optimizer = optim.SGD(model.parameters(), lr=0.01)
+optimizer = optim.Adam(model.parameters(), lr=0.01)
+# optimizer = optim.SGD(model.parameters(), lr=0.01)
 # learning rate is at default
-loss_fn = nn.NLLLoss()
-# loss_fn = nn.CrossEntropyLoss()
+# loss_fn = nn.NLLLoss()
+loss_fn = nn.CrossEntropyLoss()
 
 epochs = 500
 for epoch in range(1, epochs + 1):
